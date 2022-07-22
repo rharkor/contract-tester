@@ -1,18 +1,19 @@
 <template>
   <div class="home">
-    <img alt="Vue logo" src="../assets/logo.png" />
-    <HelloWorld msg="Welcome to Your Vue.js App" />
+    <ContractSearchBarVue />
   </div>
 </template>
 
 <script>
-// @ is an alias to /src
-import HelloWorld from "@/components/HelloWorld.vue";
-
+import ContractSearchBarVue from "@/components/ContractSearchBarVue.vue";
 export default {
-  name: "HomeView",
   components: {
-    HelloWorld,
+    ContractSearchBarVue,
   },
 };
 </script>
+
+<style scoped lang="sass">
+.home
+  height: 100%
+</style>
