@@ -107,7 +107,7 @@ export default {
     async retreiveContract() {
       if (this.web3.isInjected) {
         const { eth } = this.web3.web3Instance();
-        eth.handleRevert = true;
+        // eth.handleRevert = true;
         const { address } = this.$route.params;
         try {
           const contract = await eth.getCode(address);
