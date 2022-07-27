@@ -2,6 +2,7 @@
   <div class="contract-vue">
     <MetamaskVue />
     <ConnectedChainVue :web3="web3" :returnHome="true" />
+    <div class="topbar"><ConverterVue /></div>
     <div class="container" style="height: 100%">
       <ContractAbi
         v-if="contractValidated && !abiCode"
@@ -10,10 +11,27 @@
       />
 
       <div class="interactions" v-if="abiCode">
-        <SearchBarVue
-          v-on:value-change="findMethod"
-          :debounce="false"
-        ></SearchBarVue>
+        <div class="search">
+          <SearchBarVue
+            v-on:value-change="findMethod"
+            :debounce="false"
+          ></SearchBarVue>
+          <div class="sub">
+            <a
+              class="address-link"
+              @click="
+                () => {
+                  copyText(web3.accounts[0]);
+                }
+              "
+              >{{ web3.accounts ? web3.accounts[0] : "" }}</a
+            >
+            &nbsp;|&nbsp;
+            <button class="btn btn-outline-warning" @click="resetAbi">
+              Change the abi
+            </button>
+          </div>
+        </div>
         <div class="group" v-for="method in Object.keys(methods)" :key="method">
           <form
             v-for="button in methods[method]"
@@ -40,6 +58,7 @@
               :type="input.form"
               :key="input.name"
               :placeholder="`${input.type}: ${input.name}`"
+              :data-inputtype="input.type"
             />
             <button
               :class="`btn btn-${button.stateMutabilityColor}`"
@@ -85,6 +104,7 @@ import ConnectedChainVue from "@/widgets/ConnectedChainVue.vue";
 import ContractAbi from "@/widgets/ContractAbiVue.vue";
 import LoaderVue from "../widgets/LoaderVue.vue";
 import SearchBarVue from "@/widgets/SearchBarVue.vue";
+import ConverterVue from "./ConverterVue.vue";
 
 export default {
   setup() {
@@ -96,6 +116,9 @@ export default {
     web3() {
       return this.$store.state.web3;
     },
+    contractAddress() {
+      return this.$route.params.address;
+    },
   },
   data: () => ({
     contractValidated: null,
@@ -105,7 +128,7 @@ export default {
   }),
   methods: {
     async retreiveContract() {
-      if (this.web3.isInjected) {
+      if (this.web3.isInjected && this.web3.web3Instance) {
         const { eth } = this.web3.web3Instance();
         // eth.handleRevert = true;
         const { address } = this.$route.params;
@@ -118,108 +141,127 @@ export default {
           }
           this.contractValidated = !!contract;
         } catch (err) {
+          if (e.code === -32603) {
+            this.retreiveContract();
+            return;
+          }
           console.error(err);
           this.toast.error("The address checksum is invalid");
           this.$router.push("/");
         }
       }
     },
+    async resetAbi() {
+      localStorage.setItem(this.contractAddress, null);
+      this.abiCode = null;
+      this.contract = null;
+    },
     async interact(abiCode) {
       this.abiCode = JSON.parse(abiCode);
-      const { eth } = this.web3.web3Instance();
+      // Save it to the local storage
       const { address } = this.$route.params;
-      // Create the contract
-      this.contract = new eth.Contract(this.abiCode, address);
+      localStorage.setItem(address, abiCode);
 
-      // const test = await this.contract.methods.symbol().call();
-      let allMethods = this.abiCode.filter((el) => el.type === "function");
-      allMethods.map((el) => {
-        switch (el.stateMutability) {
-          case "view":
-            el.stateMutabilityColor = "primary";
-            el.stateOrder = 0;
-            break;
-          case "nonpayable":
-            el.stateMutabilityColor = "warning";
-            el.stateOrder = 1;
-            break;
-          case "payable":
-            el.stateMutabilityColor = "danger";
-            el.stateOrder = 2;
-            break;
-          default:
-            el.stateMutabilityColor = "dark";
-            el.stateOrder = 3;
-        }
+      if (this.web3.isInjected && this.web3.web3Instance) {
+        const { eth } = this.web3.web3Instance();
+        // Create the contract
+        this.contract = new eth.Contract(this.abiCode, address);
 
-        el.inputsFormatted = [];
-        el.inputs.map((_, i) => {
-          el.inputsFormatted[i] = { form: "text" };
-          if (_.type.match(/uint.*/)) {
-            el.inputsFormatted[i] = { form: "number" };
+        // const test = await this.contract.methods.symbol().call();
+        let allMethods = this.abiCode.filter((el) => el.type === "function");
+        allMethods.map((el) => {
+          switch (el.stateMutability) {
+            case "view":
+              el.stateMutabilityColor = "primary";
+              el.stateOrder = 0;
+              break;
+            case "nonpayable":
+              el.stateMutabilityColor = "warning";
+              el.stateOrder = 1;
+              break;
+            case "payable":
+              el.stateMutabilityColor = "danger";
+              el.stateOrder = 2;
+              break;
+            default:
+              el.stateMutabilityColor = "dark";
+              el.stateOrder = 3;
           }
-          el.inputsFormatted[i] = {
-            ...el.inputsFormatted,
-            name: _.name,
-            type: _.type,
-          };
+
+          el.inputsFormatted = [];
+          el.inputs.map((_, i) => {
+            el.inputsFormatted[i] = { form: "text" };
+            if (_.type.match(/uint.*/)) {
+              el.inputsFormatted[i] = { form: "number" };
+            }
+            el.inputsFormatted[i] = {
+              ...el.inputsFormatted,
+              name: _.name,
+              type: _.type,
+            };
+          });
+
+          return el;
         });
 
-        return el;
-      });
+        let allMethodsFiltered = {};
+        allMethods.forEach((el) => {
+          if (el.stateOrder === 0) {
+            if (!allMethodsFiltered[0]) allMethodsFiltered[0] = [];
+            allMethodsFiltered[0].push(el);
+          }
+          if (el.stateOrder === 1) {
+            if (!allMethodsFiltered[1]) allMethodsFiltered[1] = [];
+            allMethodsFiltered[1].push(el);
+          }
+          if (el.stateOrder === 2) {
+            if (!allMethodsFiltered[2]) allMethodsFiltered[2] = [];
+            allMethodsFiltered[2].push(el);
+          }
+          if (el.stateOrder === 3) {
+            if (!allMethodsFiltered[3]) allMethodsFiltered[3] = [];
+            allMethodsFiltered[3].push(el);
+          }
+        });
 
-      let allMethodsFiltered = {};
-      allMethods.forEach((el) => {
-        if (el.stateOrder === 0) {
-          if (!allMethodsFiltered[0]) allMethodsFiltered[0] = [];
-          allMethodsFiltered[0].push(el);
-        }
-        if (el.stateOrder === 1) {
-          if (!allMethodsFiltered[1]) allMethodsFiltered[1] = [];
-          allMethodsFiltered[1].push(el);
-        }
-        if (el.stateOrder === 2) {
-          if (!allMethodsFiltered[2]) allMethodsFiltered[2] = [];
-          allMethodsFiltered[2].push(el);
-        }
-        if (el.stateOrder === 3) {
-          if (!allMethodsFiltered[3]) allMethodsFiltered[3] = [];
-          allMethodsFiltered[3].push(el);
-        }
-      });
+        this.methods = allMethodsFiltered;
 
-      this.methods = allMethodsFiltered;
-
-      await nextTick();
-      // Execute all the view methods without inputs data
-      this.methods[0].forEach(async (el) => {
-        if (el.inputsFormatted.length === 0) {
-          const resultEl = document.querySelector(
-            "#form-" + el.name + " .result"
-          );
-          const refresh = async () => {
-            resultEl.classList.add("loading");
-            try {
-              const result = await this.contract.methods[el.name]().call({
-                from: this.web3.accounts[0],
-              });
-              resultEl.querySelector(".text").innerText = result;
-            } catch (e) {}
-            resultEl.classList.remove("loading");
-          };
-          setInterval(async () => {
+        await nextTick();
+        // Execute all the view methods without inputs data
+        this.methods[0].forEach(async (el) => {
+          if (el.inputsFormatted.length === 0) {
+            const resultEl = document.querySelector(
+              "#form-" + el.name + " .result"
+            );
+            const refresh = async () => {
+              resultEl.classList.add("loading");
+              try {
+                const result = await this.contract.methods[el.name]().call({
+                  from: this.web3.accounts[0],
+                });
+                resultEl.querySelector(".text").innerText = result;
+              } catch (e) {}
+              resultEl.classList.remove("loading");
+            };
+            setInterval(async () => {
+              refresh();
+            }, 5000);
             refresh();
-          }, 5000);
-          refresh();
-        }
-      });
+          }
+        });
+      }
     },
     async execute(name, event) {
       const { target } = event;
       const values = [];
       const formData = Array.from(target.querySelectorAll("input") || []);
       formData.forEach((el) => {
-        values.push(el.value);
+        if (el.dataset.inputtype !== "string") {
+          const value = Function('"use strict"; return ' + el.value + "")();
+          values.push(value);
+        } else {
+          values.push(el.value);
+        }
       });
       try {
         target.querySelector(".result").classList.add("loading");
@@ -250,9 +292,11 @@ export default {
       } catch (e) {
         if (e.code === -32603) {
           this.toast.warning("Please retry");
+        } else if (e.message.indexOf("expected array value") !== -1) {
+          this.toast.error("Expected an array");
         } else {
           this.toast.error(e.message);
-          console.error(e.message);
+          console.error(e.code, e.message);
         }
       }
       target.querySelector(".result").classList.remove("loading");
@@ -260,6 +304,12 @@ export default {
     copy(id) {
       const targetEl = document.querySelector(`#text-${id}`);
       navigator.clipboard.writeText(targetEl.innerText);
+      this.toast.info("Copied !", {
+        position: POSITION.BOTTOM_CENTER,
+      });
+    },
+    copyText(text) {
+      navigator.clipboard.writeText(text);
       this.toast.info("Copied !", {
         position: POSITION.BOTTOM_CENTER,
       });
@@ -280,11 +330,21 @@ export default {
       deep: true,
       handler() {
         this.retreiveContract();
+        const localAbiCode =
+          localStorage.getItem(this.$route.params.address) || null;
+        if (localAbiCode) {
+          this.interact(localAbiCode);
+        }
       },
     },
   },
   mounted() {
     this.retreiveContract();
+    const localAbiCode =
+      localStorage.getItem(this.$route.params.address) || null;
+    if (localAbiCode) {
+      this.interact(localAbiCode);
+    }
   },
   components: {
     MetamaskVue,
@@ -292,6 +352,7 @@ export default {
     ContractAbi,
     LoaderVue,
     SearchBarVue,
+    ConverterVue,
   },
 };
 </script>
@@ -304,10 +365,32 @@ export default {
   overflow: auto
   gap: 1rem
 
+  .topbar
+    position: fixed
+    width: 100%
+    display: flex
+    flex-direction: row
+    justify-content: center
+    z-index: 1000
+    pointer-events: none
+
   .interactions
     display: flex
     flex-direction: column
     gap: 5rem
+
+    .search
+      display: flex
+      flex-direction: column
+      gap: .5rem
+
+      .address-link
+        color: var(--blue-0)
+        text-decoration: none
+
+        &:hover
+          cursor: pointer
+          color: var(--blue-50)
 
     .group
       display: grid
@@ -371,7 +454,7 @@ export default {
             position: absolute
             height: 100%
             aspect-ratio: 1
-            right: 4px
+            left: 4px
             padding: 4px
 
           &.loading

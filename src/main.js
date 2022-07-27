@@ -11,5 +11,6 @@ createApp(App)
   .use(router)
   .use(Toast, {
     position: POSITION.BOTTOM_RIGHT,
+    timeout: 5000,
   })
   .mount("#app");
