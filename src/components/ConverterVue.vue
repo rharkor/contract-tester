@@ -1,6 +1,6 @@
 <template>
   <div :class="`ConverterVue ${deployed ? 'deployed' : ''}`">
-    <div class="toolbox" @click="deploy">
+    <div class="toolbox" @click="toggle">
       <i class="fa-solid fa-arrows-rotate"></i>
     </div>
     <div class="content">
@@ -119,6 +119,9 @@ export default {
     hide() {
       if (this.deployed) this.deployed = false;
     },
+    toggle() {
+      this.deployed = !this.deployed;
+    },
     updateConversionValue(value) {
       this.amountConverted = new BigNumber(
         (value * 10 ** conversionTable[this.from]) /
@@ -148,62 +151,62 @@ export default {
 
 <style scoped lang="sass">
 .ConverterVue
+  display: flex
+  flex-direction: column-reverse
+  align-items: center
+  transition: transform ease-in-out .5s
+  pointer-events: all
+  transform: translateY(-220px)
+
+  &.deployed
+    transform: translateY(0)
+
+  .toolbox
+    width: 50px
+    height: 50px
+    border-radius: 0 0 .25rem .25rem
+    background-color: #4AA53B
     display: flex
-    flex-direction: column-reverse
+    justify-content: center
     align-items: center
-    transition: transform ease-in-out .5s
-    pointer-events: all
-    transform: translateY(-220px)
+    font-size: x-large
+    transition: opacity ease-in-out .2s
 
-    &.deployed
-        transform: translateY(0)
+    &:hover
+      opacity: .8
 
-    .toolbox
-        width: 50px
-        height: 50px
-        border-radius: 0 0 .25rem .25rem
-        background-color: #82EC2F
+  .content
+    top: 0
+    height: 220px
+
+    .card
+      background-color: #4AA53B
+      border: none
+      border-radius: 0 0 1rem 1rem
+      height: 100%
+
+      .card-body
+        gap: .75rem
         display: flex
-        justify-content: center
-        align-items: center
-        font-size: x-large
-        transition: background-color ease-in-out .2s
+        flex-direction: column
 
-        &:hover
-            background-color: #6CC526
+        .units-selection
+          display: flex
+          flex-direction: row
+          justify-content: center
+          align-items: center
+          gap: .5rem
 
-    .content
-        top: 0
-        height: 220px
+  .copy-div
+    position: relative
 
-        .card
-            background-color: #82EC2F
-            border: none
-            border-radius: 0 0 1rem 1rem
-            height: 100%
+    .btn-copy
+      opacity: 0.3
+      position: absolute
+      right: 0
+      top: 0
+      transition: opacity .3s ease-in-out
 
-            .card-body
-                gap: .75rem
-                display: flex
-                flex-direction: column
-
-                .units-selection
-                    display: flex
-                    flex-direction: row
-                    justify-content: center
-                    align-items: center
-                    gap: .5rem
-
-    .copy-div
-        position: relative
-
-        .btn-copy
-            opacity: 0.3
-            position: absolute
-            right: 0
-            top: 0
-            transition: opacity .3s ease-in-out
-
-            &:hover
-                opacity: 1
+      &:hover
+        opacity: 1
 </style>

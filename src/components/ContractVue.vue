@@ -141,7 +141,7 @@ export default {
           }
           this.contractValidated = !!contract;
         } catch (err) {
-          if (e.code === -32603) {
+          if (err.code === -32603) {
             this.retreiveContract();
             return;
           }
@@ -273,20 +273,41 @@ export default {
           });
         } else if (method.stateMutability === "payable") {
           let valuesWithoutPrice = values.slice(1);
-          result = await this.contract.methods[name](
-            ...valuesWithoutPrice
-          ).send({
-            from: this.web3.accounts[0],
-            value: values[0],
-          });
-          // Override to null
-          result = null;
+          try {
+            await this.contract.methods[name](
+              ...valuesWithoutPrice
+            ).estimateGas({
+              from: this.web3.accounts[0],
+              value: values[0],
+            });
+            result = await this.contract.methods[name](
+              ...valuesWithoutPrice
+            ).send({
+              from: this.web3.accounts[0],
+              value: values[0],
+            });
+            // Override to null
+            result = null;
+          } catch (e) {
+            const errorFormatted = this.extractMetamaskError(e.message);
+            this.toast.error(errorFormatted.message.toString());
+            console.error(e.message);
+          }
         } else {
-          result = await this.contract.methods[name](...values).send({
-            from: this.web3.accounts[0],
-          });
-          // Override to null
-          result = null;
+          try {
+            await this.contract.methods[name](...values).estimateGas({
+              from: this.web3.accounts[0],
+            });
+            result = await this.contract.methods[name](...values).send({
+              from: this.web3.accounts[0],
+            });
+            // Override to null
+            result = null;
+          } catch (e) {
+            const errorFormatted = this.extractMetamaskError(e.message);
+            this.toast.error(errorFormatted.message.toString());
+            console.error(e.message);
+          }
         }
         target.querySelector(".result .text").innerText = result;
       } catch (e) {
@@ -300,6 +321,11 @@ export default {
         }
       }
       target.querySelector(".result").classList.remove("loading");
+    },
+    extractMetamaskError(error) {
+      const regexp = /{(.|\s)*}/gm;
+      const matches = error.match(regexp);
+      return JSON.parse(matches[0]);
     },
     copy(id) {
       const targetEl = document.querySelector(`#text-${id}`);
