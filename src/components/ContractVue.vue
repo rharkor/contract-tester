@@ -323,9 +323,14 @@ export default {
       target.querySelector(".result").classList.remove("loading");
     },
     extractMetamaskError(error) {
-      const regexp = /{(.|\s)*}/gm;
-      const matches = error.match(regexp);
-      return JSON.parse(matches[0]);
+      try {
+        const regexp = /{(.|\s)*}/gm;
+        const matches = error.match(regexp);
+        const result = JSON.parse(matches[0]);
+        return result;
+      } catch (e) {
+        return { message: error };
+      }
     },
     copy(id) {
       const targetEl = document.querySelector(`#text-${id}`);
