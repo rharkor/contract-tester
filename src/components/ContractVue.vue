@@ -32,62 +32,87 @@
             </button>
           </div>
         </div>
-        <div class="group" v-for="method in Object.keys(methods)" :key="method">
-          <form
-            v-for="button in methods[method]"
-            :key="button.name"
-            class="basic-form"
-            :id="`form-${button.name}`"
-            @submit="
-              (e) => {
-                e.preventDefault();
-                this.execute(button.name, e);
-              }
-            "
-          >
-            <input
-              v-if="button.stateMutability === 'payable'"
-              placeholder="WEI to send"
-              class="form-control text-light place-light"
-              style="background-color: rgba(25, 255, 25, 0.3)"
-              type="number"
-            />
-            <input
-              v-for="input in button.inputsFormatted"
-              class="form-control"
-              :type="input.form"
-              :key="input.name"
-              :placeholder="`${input.type}: ${input.name}`"
-              :data-inputtype="input.type"
-            />
-            <button
-              :class="`btn btn-${button.stateMutabilityColor}`"
-              type="submit"
-            >
-              {{ button.name }}
-            </button>
-            <div class="result">
-              <div
-                class="d-flex align-items-center justify-content-between w-100"
+        <div class="methods">
+          <div class="auto-refresh">
+            <div class="form-check form-switch">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+                id="autoRefreshSwitch"
+                v-model="autoRefresh"
+              />
+              <label class="form-check-label" for="autoRefreshSwitch"
+                >Auto refresh values</label
               >
-                <div class="text" :id="`text-${button.name}`"></div>
-                <button
-                  class="btn btn-dark btn-copy"
-                  type="button"
-                  @click="
-                    () => {
-                      copy(button.name);
-                    }
+            </div>
+          </div>
+          <div
+            class="group"
+            v-for="method in Object.keys(methods)"
+            :key="method"
+          >
+            <form
+              v-for="button in methods[method]"
+              :key="button.name"
+              class="basic-form"
+              :id="`form-${button.name}`"
+              @submit="
+                (e) => {
+                  e.preventDefault();
+                  this.execute(button.name, e);
+                }
+              "
+            >
+              <input
+                v-if="button.stateMutability === 'payable'"
+                placeholder="WEI to send"
+                class="form-control text-light place-light"
+                style="background-color: rgba(25, 255, 25, 0.3)"
+                type="number"
+              />
+              <input
+                v-for="input in button.inputsFormatted"
+                class="form-control"
+                :type="input.form"
+                :key="input.name"
+                :placeholder="`${input.type}: ${input.name}`"
+                :data-inputtype="input.type"
+              />
+              <button
+                :class="`btn btn-${button.stateMutabilityColor}`"
+                type="submit"
+              >
+                {{ button.name }}
+              </button>
+              <div class="result">
+                <div
+                  class="
+                    d-flex
+                    align-items-center
+                    justify-content-between
+                    w-100
                   "
                 >
-                  <i class="fa-solid fa-copy"></i>
-                </button>
+                  <div class="text" :id="`text-${button.name}`"></div>
+                  <button
+                    class="btn btn-dark btn-copy"
+                    type="button"
+                    @click="
+                      () => {
+                        copy(button.name);
+                      }
+                    "
+                  >
+                    <i class="fa-solid fa-copy"></i>
+                  </button>
+                </div>
+                <div class="loader">
+                  <LoaderVue />
+                </div>
               </div>
-              <div class="loader">
-                <LoaderVue />
-              </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -125,6 +150,7 @@ export default {
     abiCode: null,
     contract: null,
     methods: [],
+    autoRefresh: false,
   }),
   methods: {
     async retreiveContract() {
@@ -244,7 +270,9 @@ export default {
               resultEl.classList.remove("loading");
             };
             setInterval(async () => {
-              refresh();
+              if (this.autoRefresh) {
+                refresh();
+              }
             }, 5000);
             refresh();
           }
@@ -256,8 +284,11 @@ export default {
       const values = [];
       const formData = Array.from(target.querySelectorAll("input") || []);
       formData.forEach((el) => {
-        if (el.dataset.inputtype !== "string") {
-          const value = Function('"use strict"; return ' + el.value + "")();
+        if (
+          el.dataset.inputtype !== "string" &&
+          el.dataset.inputtype !== "address"
+        ) {
+          const value = Function('"use strict"; return ' + el.value)();
           values.push(value);
         } else {
           values.push(el.value);
@@ -308,6 +339,15 @@ export default {
             this.toast.error(errorFormatted.message.toString());
             console.error(e.message);
           }
+        }
+        if (typeof result === "object") {
+          const allResults = {};
+          Object.keys(result).forEach((value) => {
+            if (isNaN(value)) {
+              allResults[value] = result[value];
+            }
+          });
+          result = JSON.stringify(allResults);
         }
         target.querySelector(".result .text").innerText = result;
       } catch (e) {
@@ -422,6 +462,16 @@ export default {
         &:hover
           cursor: pointer
           color: var(--blue-50)
+
+    .methods
+      display: flex
+      flex-direction: column
+      gap: 1rem
+
+      .auto-refresh
+        display: flex
+        flex-direction: row
+        justify-content: flex-end
 
     .group
       display: grid
